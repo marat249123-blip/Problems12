@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мониторинг с фото-картой</title>
+    <style>
+        html, body {
+            margin: 0; padding: 0; height: 100vh; width: 100vw;
+            overflow: hidden; font-family: 'Arial Black', sans-serif;
+            background-color: #000; color: #fff;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr 0.6fr; 
+            grid-template-rows: 1fr 1fr;
+            gap: 20px;
+            height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .chat-tile {
+            background: #1a1a1a;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            border: 4px solid #333;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            padding: 15px; font-size: 1.5rem; text-align: center;
+            font-weight: 900; color: #000; text-transform: uppercase; outline: none;
+        }
+
+        .h-magistral { background-color: #ff3e3e; }
+        .h-bs { background-color: #ffa500; }
+        .h-other { background-color: #2e90ff; }
+        .h-notes { background-color: #bcff2e; }
+
+        .messages {
+            flex-grow: 1; padding: 15px; overflow-y: auto;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+
+        .msg-wrapper { position: relative; width: fit-content; max-width: 90%; }
+        .msg {
+            background: #fff; color: #000; padding: 10px 15px; border-radius: 8px;
+            font-size: 1.3rem; font-weight: bold; box-shadow: 4px 4px 0px #444; outline: none;
+        }
+
+        .delete-btn {
+            position: absolute; top: -10px; right: -10px;
+            background: red; color: white; border: none; border-radius: 50%;
+            width: 25px; height: 25px; cursor: pointer; display: none;
+        }
+        .msg-wrapper:hover .delete-btn { display: block; }
+
+        .input-area { padding: 15px; background: #222; }
+        .input-area input {
+            width: 100%; background: #000; border: 2px solid #555;
+            color: #bcff2e; padding: 10px; font-size: 1.1rem; outline: none;
+        }
+
+        /* Стили для плиты карты */
+        .map-tile {
+            grid-column: 3; grid-row: 1 / span 2;
+            background: #111; border: 5px dashed #444;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            position: relative; overflow: hidden;
+        }
+
+        #map-container {
+            width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+        }
+
+        #map-container img {
+            max-width: 100%; max-height: 100%; object-fit: contain;
+        }
+
+        .map-placeholder {
+            text-align: center; color: #bcff2e; font-size: 1.5rem; pointer-events: none;
+        }
+
+        #file-input { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <div class="chat-tile" data-id="tile1">
+        <div class="chat-header h-magistral" contenteditable="true" oninput="saveAll()">МАГИСТРАЛЬНАЯ АВАРИЯ</div>
+        <div class="messages" id="msgs1"></div>
+        <div class="input-area"><input type="text" placeholder="ДОБАВИТЬ..." onkeydown="handleInput(event, 'msgs1')"></div>
+    </div>
+
+    <div class="chat-tile" data-id="tile2">
+        <div class="chat-header h-bs" contenteditable="true" oninput="saveAll()">АВАРИЯ НА БС</div>
+        <div class="messages" id="msgs2"></div>
+        <div class="input-area"><input type="text" placeholder="ДОБАВИТЬ..." onkeydown="handleInput(event, 'msgs2')"></div>
+    </div>
+
+    <div class="chat-tile" data-id="tile3">
+        <div class="chat-header h-other" contenteditable="true" oninput="saveAll()">ИНЫЕ ПРОБЛЕМЫ</div>
+        <div class="messages" id="msgs3"></div>
+        <div class="input-area"><input type="text" placeholder="ДОБАВИТЬ..." onkeydown="handleInput(event, 'msgs3')"></div>
+    </div>
+
+    <div class="chat-tile" data-id="tile4">
+        <div class="chat-header h-notes" contenteditable="true" oninput="saveAll()">ЗАМЕТКИ</div>
+        <div class="messages" id="msgs4"></div>
+        <div class="input-area"><input type="text" placeholder="ДОБАВИТЬ..." onkeydown="handleInput(event, 'msgs4')"></div>
+    </div>
+
+    <div class="map-tile" onclick="document.getElementById('file-input').click()">
+        <input type="file" id="file-input" accept="image/*" onchange="uploadImage(this)">
+        <div id="map-container">
+            <div class="map-placeholder">КЛИКНИ СЮДА,<br>ЧТОБЫ ЗАГРУЗИТЬ<br>КАРТУ СЕТИ</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', loadAll);
+
+    function handleInput(event, containerId) {
+        if (event.key === 'Enter' && event.target.value.trim() !== '') {
+            createMessage(containerId, event.target.value.toUpperCase());
+            event.target.value = '';
+            saveAll();
+        }
+    }
+
+    function createMessage(containerId, text) {
+        const container = document.getElementById(containerId);
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper';
+        const newMessage = document.createElement('div');
+        newMessage.className = 'msg';
+        newMessage.contentEditable = "true";
+        newMessage.textContent = text;
+        newMessage.oninput = saveAll;
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.innerHTML = '×';
+        delBtn.onclick = function() { wrapper.remove(); saveAll(); };
+        wrapper.appendChild(newMessage);
+        wrapper.appendChild(delBtn);
+        container.appendChild(wrapper);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function uploadImage(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const imgData = e.target.result;
+                displayImage(imgData);
+                saveAll();
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function displayImage(src) {
+        const container = document.getElementById('map-container');
+        container.innerHTML = `<img src="${src}" alt="Network Map">`;
+    }
+
+    function saveAll() {
+        const data = { tiles: {}, mapImg: null };
+        document.querySelectorAll('.chat-tile').forEach(tile => {
+            const id = tile.getAttribute('data-id');
+            const headerText = tile.querySelector('.chat-header').textContent;
+            const messages = [];
+            tile.querySelectorAll('.msg').forEach(m => messages.push(m.textContent));
+            data.tiles[id] = { header: headerText, msgs: messages };
+        });
+        const img = document.querySelector('#map-container img');
+        if (img) data.mapImg = img.src;
+        
+        localStorage.setItem('dashboardDataV2', JSON.stringify(data));
+    }
+
+    function loadAll() {
+        const saved = localStorage.getItem('dashboardDataV2');
+        if (!saved) return;
+        const data = JSON.parse(saved);
+        
+        for (const id in data.tiles) {
+            const tile = document.querySelector(`[data-id="${id}"]`);
+            if (tile) {
+                tile.querySelector('.chat-header').textContent = data.tiles[id].header;
+                const containerId = tile.querySelector('.messages').id;
+                data.tiles[id].msgs.forEach(text => createMessage(containerId, text));
+            }
+        }
+        if (data.mapImg) displayImage(data.mapImg);
+    }
+</script>
+
+</body>
+</html>
